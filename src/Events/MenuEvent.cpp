@@ -1,8 +1,6 @@
 export module WrenRim.Events.MenuEvent;
 
 import WrenRim.Events.EventsCtx;
-import WrenRim.UI.Prisma;
-import WrenRim.Config;
 
 namespace events::menu_event {
 
@@ -33,8 +31,6 @@ export struct menu_event_handler final : RE::BSTEventSink<RE::MenuOpenCloseEvent
     }
 
     auto ctx = events_ctx::process_event_menu_ctx{menu_event, event_source, menu_event->menuName, menu_event->opening};
-    config::on_menu_event(ctx);
-      ui::prisma::on_menu_event(ctx);
     return RE::BSEventNotifyControl::kContinue;
   }
     

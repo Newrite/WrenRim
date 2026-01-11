@@ -1,8 +1,6 @@
 ﻿export module WrenRim.Core.Hooks;
 
 import WrenRim.Core.HooksCtx;
-import WrenRim.Features.TrueFlasks;
-import WrenRim.UI.Prisma;
 
 namespace core::hooks
 {
@@ -34,9 +32,8 @@ namespace core::hooks
     static constexpr auto offset_vtable_drink_potion = RELOCATION_OFFSET(0x10F, 0x10F);
     static constexpr auto offset_vtable_remove_item = RELOCATION_OFFSET(0x56, 0x56);
 
-    static auto on_update(hooks_ctx::on_actor_update& ctx) -> void
+    static auto on_update(hooks_ctx::on_actor_update&) -> void
     {
-      features::true_flasks::update(ctx);
     }
 
     static auto on_update_character(RE::Character* character, const float delta) -> void
@@ -61,7 +58,6 @@ namespace core::hooks
 
       auto ctx = hooks_ctx::on_actor_update{character, last_player_delta};
       on_update(ctx);
-      ui::prisma::update(ctx);
 
       return on_update_player_character_original(character, delta);
     }
@@ -70,8 +66,8 @@ namespace core::hooks
     static auto on_drink_potion(RE::Character* character, RE::AlchemyItem* potion,
                                 RE::ExtraDataList* extra_list) -> bool
     {
-      auto ctx = hooks_ctx::on_actor_drink_potion{character, potion, extra_list};
-      return features::true_flasks::drink_potion(ctx);
+      auto _ = hooks_ctx::on_actor_drink_potion{character, potion, extra_list};
+      return true;
     }
 
     static auto on_drink_potion_character(RE::Character* character, RE::AlchemyItem* potion,
@@ -98,15 +94,13 @@ namespace core::hooks
 
     static auto on_remove_item_character(RE::Character* actor, RE::TESBoundObject* item, std::int32_t count, RE::ITEM_REMOVE_REASON reason, RE::ExtraDataList* extra_list, RE::TESObjectREFR* move_to_ref, const RE::NiPoint3* drop_loc, const RE::NiPoint3* rotate) -> RE::ObjectRefHandle
     {
-        auto ctx = hooks_ctx::on_actor_remove_item{actor, item, count, reason, move_to_ref, drop_loc, rotate};
-        features::true_flasks::remove_item(ctx);
+        auto _ = hooks_ctx::on_actor_remove_item{actor, item, count, reason, move_to_ref, drop_loc, rotate};
         return on_remove_item_character_original(actor, item, count, reason, extra_list, move_to_ref, drop_loc, rotate);
     }
 
     static auto on_remove_item_player_character(RE::PlayerCharacter* actor, RE::TESBoundObject* item, std::int32_t count, RE::ITEM_REMOVE_REASON reason, RE::ExtraDataList* extra_list, RE::TESObjectREFR* move_to_ref, const RE::NiPoint3* drop_loc, const RE::NiPoint3* rotate) -> RE::ObjectRefHandle
     {
-        auto ctx = hooks_ctx::on_actor_remove_item{actor, item, count, reason, move_to_ref, drop_loc, rotate};
-        features::true_flasks::remove_item(ctx);
+        auto _ = hooks_ctx::on_actor_remove_item{actor, item, count, reason, move_to_ref, drop_loc, rotate};
         return on_remove_item_player_character_original(actor, item, count, reason, extra_list, move_to_ref, drop_loc, rotate);
     }
 
