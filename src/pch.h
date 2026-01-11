@@ -1,11 +1,14 @@
 #pragma once
 
 #pragma execution_character_set("utf-8")
+#define NOMINMAX
 
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
 #include <SKSE/API.h>
 #include <ranges>
+#include <wren.hpp>
+#include <wrenbind17/wrenbind17.hpp>
 
 namespace logger = SKSE::log;
 namespace stl = SKSE::stl;

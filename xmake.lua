@@ -52,10 +52,19 @@ target("zzWrenRim")
 
     -- add src files
     add_includedirs("src")
+    add_includedirs("src/library/")
+    
+    add_includedirs("src/library/wren/src/vm")
+    add_includedirs("src/library/wren/src/include")
+    add_includedirs("src/library/wren/src/optional")
+    add_includedirs("src/library/wrenbind17/include/")
+    
     set_pcxxheader("src/pch.h")
 
     -- Собираем все нужные файлы
-    add_headerfiles("src/**.h", "src/**.hpp")
+    add_headerfiles("src/**.h", "src/**.hpp", "src/**.wren")
+    add_files("src/library/wren/src/vm/*.c", {warnings = "none", cxflags = "/wd4200 /wd4100 /wd4996 /wd4244 /wd4456"})
+    add_files("src/library/wren/src/optional/*.c", {warnings = "none", cxflags = "/wd4200 /wd4100 /wd4996 /wd4244 /wd4456"})
     add_files("src/**.cpp")
     -- Можно добавить Wren файлы в проект, чтобы видеть их в IDE,
     -- но исключить из компиляции C++, так как у нас свое правило copy
