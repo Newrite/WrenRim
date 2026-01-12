@@ -18,6 +18,9 @@ set_defaultmode("releasedbg")
 add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
 
+-- add requirements
+add_requires("spdlog", "fmt")
+
 -- set policies
 set_policy("package.requires_lock", true)
 set_policy("check.auto_ignore_flags", false)
@@ -68,7 +71,7 @@ target("zzWrenRim")
     add_files("src/**.cpp")
     -- Можно добавить Wren файлы в проект, чтобы видеть их в IDE,
     -- но исключить из компиляции C++, так как у нас свое правило copy
-    add_files("src/WrenRimStd/**.wren", {rule = "whren_scripts"})
+    add_files("src/WrenRim/**.wren", {rule = "whren_scripts"})
 
     after_build(function(target)
         import("core.project.task")
@@ -76,22 +79,23 @@ target("zzWrenRim")
         -- Пути
         local project_dir = os.projectdir()
         local dist_dir = path.join(project_dir, "dist")
-        local scripts_src = path.join(project_dir, "src", "WrenRimStd")
+        
+        -- Источник скриптов: src/WrenRim (там лежат Std, WrenMods)
+        local scripts_src = path.join(project_dir, "src", "WrenRim")
 
         -- Целевая структура внутри dist:
         -- dist/SKSE/Plugins/zzWrenRim.dll
-        -- dist/SKSE/Plugins/WrenRim/WrenRimStd/
+        -- dist/SKSE/Plugins/WrenRim/ (Std, WrenMods)
         local plugins_dir = path.join(dist_dir, "SKSE", "Plugins")
         local mod_data_dir = path.join(plugins_dir, "WrenRim")
-        local scripts_dist = path.join(mod_data_dir, "WrenRimStd")
 
-        -- 1. Очистка и создание папки dist
+        -- 1. Очистка папки dist
         if os.exists(dist_dir) then
-            os.rm(path.join(dist_dir, "*"))
+            os.tryrm(path.join(dist_dir, "*"))
         end
 
         -- Создаем структуру папок
-        os.mkdir(scripts_dist) -- Создаст всю цепочку: dist/SKSE/Plugins/WrenRim/WrenRimStd
+        os.mkdir(mod_data_dir) -- Создаст всю цепочку: dist/SKSE/Plugins/WrenRim
 
         -- 2. Копирование бинарных файлов (DLL + PDB)
         -- Они идут прямо в SKSE/Plugins
@@ -99,17 +103,16 @@ target("zzWrenRim")
         os.trycp(target:symbolfile(), plugins_dir)
         print("Compiled binaries copied to: " .. plugins_dir)
 
-        -- 3. Копирование стандартной библиотеки Wren (WrenRimStd)
-        if os.exists(scripts_src) then
-            -- Копируем все содержимое рекурсивно
-            os.trycp(path.join(scripts_src, "**"), scripts_dist)
-            print("WrenStd scripts copied to: " .. scripts_dist)
-        else
-            print("WARNING: Source directory 'src/WrenRimStd' not found!")
-        end
+        -- 2.1 Копирование конфига
+        os.trycp(path.join(project_dir, "zzWrenRim.ini"), plugins_dir)
 
-        -- (Опционально) Копирование в папку игры для быстрой отладки
-        -- Если у вас настроена переменная окружения SkyrimPath или аналогичная
-        -- local game_path = "C:/Path/To/Skyrim/Data"
-        -- os.trycp(dist_dir .. "/*", game_path)
+        -- 3. Копирование скриптов (WrenRim folder)
+        if os.exists(scripts_src) then
+            -- Копируем все содержимое рекурсивно (Std, WrenMods, etc.)
+            -- Используем "*", чтобы скопировать структуру папок, а не "**", который разворачивает все файлы в плоский список
+            os.trycp(path.join(scripts_src, "*"), mod_data_dir)
+            print("Wren scripts copied to: " .. mod_data_dir)
+        else
+            print("WARNING: Source directory 'src/WrenRim' not found!")
+        end
     end)

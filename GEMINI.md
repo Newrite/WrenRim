@@ -161,7 +161,8 @@ iMaxFrameTimeBudgetUs = 2000
 
 ### Precompiled Headers (PCH)
 - **Global Includes:** `wren.hpp` and `wrenbind17/wrenbind17.hpp` are included globally in `src/pch.h`.
-- **Rule:** DO NOT `#include <wrenbind17/wrenbind17.hpp>` in individual `.cpp` files. It is redundant and slows down compilation. Assume `wrenbind17` namespace is always available.
+- **Rule:** DO NOT `#include "pch.h"` in individual source files (`.cpp`). The build system (xmake) is configured to force-include this header globally for all compilation units. Adding it manually is redundant and may cause issues (especially with C++ Modules).
+- **Rule:** DO NOT `#include <wrenbind17/wrenbind17.hpp>` in individual `.cpp` files. Assume `wrenbind17` namespace is always available.
 
 ### Safety & Pointers
 - **Volatile Data:** All pointers from `RE::` are volatile. Always check for `nullptr`.
@@ -173,6 +174,11 @@ iMaxFrameTimeBudgetUs = 2000
 ### Error Handling
 - **General C++:** No `try-catch` in general game logic.
 - **Wren Boundary:** Use `safe_wren_call` explicitly.
+
+### Build & Project Management (CRITICAL)
+- **Warnings as Errors:** The project treats all warnings as errors (`/WX` equivalent). You MUST resolve all warnings.
+    - **`[[nodiscard]]`:** Never ignore the return value of a function marked `[[nodiscard]]`. If the value is truly not needed, explicit check or handling is required.
+- **VS Project Updates:** Whenever you modify `xmake.lua` (add files, change rules), you MUST run the update command (e.g., `xmake project -k vsxmake2022`) to ensure the Visual Studio solution stays in sync. NEVER skip this step if build configurations change.
 
 ---
 
@@ -224,3 +230,32 @@ class PotionLogic {
 }
 Events.on("OnDrinkPotionStart", Fn.new { |a, p| PotionLogic.onDrinkStart(a, p) })
 ```
+
+### 9.3 Wren Language Constraints & Gotchas
+
+#### Variable & Field Naming
+- **Module-level variables:** MUST NOT start with an underscore (e.g., use `var listeners = {}`, NOT `var _listeners = {}`). In Wren, a leading underscore is strictly reserved for **instance fields** within a class.
+- **Static fields:** Static fields in a class must start with two underscores (e.g., `static __config`).
+- **Instance fields:** Instance fields must start with one underscore (e.g., `_actor`).
+- **Local variables:** Should start with a lowercase letter and no underscore.
+- **Error symptoms:** Using `_name` at the module level or inside a static method will cause a compile error: `"Expect variable name"` or `"Cannot use an instance field in a static method"`.
+
+#### Module Resolution & C++ Bindings (CRITICAL)
+- **Problem:** By default, `wrenbind17` resolves imports (like `import "Skyrim/Actor"`) to absolute file paths on disk. However, C++ bindings are registered against logical names (e.g., `vm.module("Skyrim/Actor")`).
+- **Symptom:** If these names don't match exactly, the VM will crash or freeze when calling `runFromModule` or when a script attempts to use a `foreign class` whose module ID has been mangled into a path.
+- **Resolution:** We override `setPathResolveFunc` in `ScriptEngine.cpp` to return the logical `name` directly, ensuring the Module ID in the VM remains "Skyrim/Actor" instead of "C:/Path/To/Skyrim/Actor.wren".
+- **Rule:** Always ensure `vm.runFromModule("Name")` matches the name used in `vm.module("Name")` in C++.
+
+#### Events System & Scoping
+- **Error:** `Events metaclass does not implement 'listeners'`.
+- **Cause:** Using a module-level variable (`var listeners`) and accessing it from a `static` class method can sometimes lead to resolution issues or "instance vs static" confusion in the Wren compiler if the variable name overlaps with field naming conventions.
+- **Resolution:** Use a **class-static field** (e.g., `static __listeners`) inside the class. This ensures the storage is explicitly bound to the class metaclass and is accessible from all static methods.
+- **Template:**
+  ```wren
+  class Events {
+      static on(event, fn) {
+          if (__listeners == null) __listeners = {}
+          // ...
+      }
+  }
+  ```

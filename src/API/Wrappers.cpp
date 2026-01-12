@@ -1,4 +1,4 @@
-﻿export module WrenRim.API.Wrappers;
+export module WrenRim.API.Wrappers;
 
 namespace api::wrappers
 {
@@ -10,6 +10,8 @@ namespace api::wrappers
             }
         }
         
+        actor() = default;
+
         [[nodiscard]] bool is_valid() const {
             return static_cast<bool>(handle_);
         }
@@ -25,6 +27,7 @@ namespace api::wrappers
 
         static void bind(wrenbind17::ForeignModule& module) {
             auto& cls = module.klass<actor>("Actor");
+            cls.ctor<>();
             cls.func<&actor::get_name>("getName");
         }
 
@@ -39,6 +42,8 @@ namespace api::wrappers
                 form_id_ = p->GetFormID();
             }
         }
+        
+        potion() = default;
 
         [[nodiscard]] RE::AlchemyItem* get() const {
             return RE::TESForm::LookupByID<RE::AlchemyItem>(form_id_);
@@ -61,6 +66,7 @@ namespace api::wrappers
 
         static void bind(wrenbind17::ForeignModule& module) {
             auto& cls = module.klass<potion>("Potion");
+            cls.ctor<>();
             cls.func<&potion::is_poison>("isPoison");
             cls.func<&potion::is_food>("isFood");
             cls.func<&potion::get_name>("getName");
@@ -71,8 +77,12 @@ namespace api::wrappers
     };
     
     export void bind_wrappers(wrenbind17::VM& vm) {
-        auto& module = vm.module("WrenRimStd/Skyrim");
-        actor::bind(module);
-        potion::bind(module);
+        // Bind Actor to "Skyrim/Actor"
+        auto& mActor = vm.module("Skyrim/Actor");
+        actor::bind(mActor);
+
+        // Bind Potion to "Skyrim/Potion"
+        auto& mPotion = vm.module("Skyrim/Potion");
+        potion::bind(mPotion);
     }
 }

@@ -48,6 +48,7 @@ namespace core::hooks
 
     static auto on_update_player_character(RE::PlayerCharacter* character, const float delta) -> void
     {
+      wren::script_engine::engine::get_singleton()->on_frame_start();
       last_player_delta = delta;
 
       if (!character || !delta) {

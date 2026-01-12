@@ -2,6 +2,8 @@ import WrenRim.Core.LoggerSetup;
 import WrenRim.UI.SKSEMenu;
 import WrenRim.Events;
 import WrenRim.Core.Hooks;
+import WrenRim.Config;
+import WrenRim.Wren.ScriptEngine;
 
 auto skse_message_handle(SKSE::MessagingInterface::Message* message) -> void
 {
@@ -16,7 +18,16 @@ auto skse_message_handle(SKSE::MessagingInterface::Message* message) -> void
     break;
   }
   case SKSE::MessagingInterface::kDataLoaded: {
+    // 1. Load Config
+    config::manager::get_singleton()->load();
+
+    // 2. Init Script Engine
+    wren::script_engine::engine::get_singleton()->initialize();
+
+    // 3. Install Hooks
     core::hooks::install_hooks();
+
+    // 4. Register Events
     events::register_events();
     break;
   }
