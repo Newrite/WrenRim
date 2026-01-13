@@ -3,7 +3,10 @@
 import WrenRim.Core.HooksCtx;
 import WrenRim.Config;
 import WrenRim.Wren.ScriptEngine;
-import WrenRim.API.Wrappers;
+import WrenRim.Wren.Wrappers.Actor;
+import WrenRim.Wren.Wrappers.AlchemyItem;
+import WrenRim.Wren.Wrappers.ActiveEffect;
+import WrenRim.Wren.Wrappers.HitData;
 
 namespace core::hooks
 {
@@ -37,13 +40,18 @@ namespace core::hooks
 
     static auto on_update_character(RE::Character* character, const float delta) -> void
     {
-      if (!character || !delta) {
+      if (!character) {
         return on_update_character_original(character, delta);
       }
 
-      auto _ = hooks_ctx::on_actor_update{character, last_player_delta};
+      wren::wrappers::actor wren_actor(character);
 
-      return on_update_character_original(character, delta);
+      wren::script_engine::engine::get_singleton()->dispatch("OnUpdateCharacterStart", wren_actor, last_player_delta);
+
+      auto _ = hooks_ctx::on_actor_update{character, last_player_delta};
+      on_update_character_original(character, delta);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnUpdateCharacterEnd", wren_actor, last_player_delta);
     }
 
     static auto on_update_player_character(RE::PlayerCharacter* character, const float delta) -> void
@@ -51,13 +59,21 @@ namespace core::hooks
       wren::script_engine::engine::get_singleton()->on_frame_start();
       last_player_delta = delta;
 
-      if (!character || !delta) {
+      if (!character) {
         return on_update_player_character_original(character, delta);
       }
 
+      wren::wrappers::actor wren_actor(character);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnUpdatePlayerStart", wren_actor,
+                                                             last_player_delta);
+
       auto _ = hooks_ctx::on_actor_update{character, last_player_delta};
 
-      return on_update_player_character_original(character, delta);
+      on_update_player_character_original(character, delta);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnUpdatePlayerEnd", wren_actor,
+                                                             last_player_delta);
     }
 
     static auto on_drink_potion_character(RE::Character* character, RE::AlchemyItem* potion,
@@ -67,14 +83,14 @@ namespace core::hooks
         return on_drink_potion_character_original(character, potion, extra_list);
       }
 
-      api::wrappers::actor wren_actor(character);
-      api::wrappers::potion wren_potion(potion);
+      wren::wrappers::actor wren_actor(character);
+      wren::wrappers::alchemy_item wren_alchemy_item(potion);
 
-      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionStart", wren_actor, wren_potion);
+      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionCharacterStart", wren_actor, wren_alchemy_item);
 
       bool result = on_drink_potion_character_original(character, potion, extra_list);
 
-      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionEnd", wren_actor, wren_potion);
+      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionCharacterEnd", wren_actor, wren_alchemy_item);
 
       return result;
     }
@@ -86,14 +102,14 @@ namespace core::hooks
         return on_drink_potion_player_character_original(character, potion, extra_list);
       }
 
-      api::wrappers::actor wren_actor(character);
-      api::wrappers::potion wren_potion(potion);
+      wren::wrappers::actor wren_actor(character);
+      wren::wrappers::alchemy_item wren_alchemy_item(potion);
 
-      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionStart", wren_actor, wren_potion);
+      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionPlayerStart", wren_actor, wren_alchemy_item);
 
       bool result = on_drink_potion_player_character_original(character, potion, extra_list);
 
-      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionEnd", wren_actor, wren_potion);
+      wren::script_engine::engine::get_singleton()->dispatch("OnDrinkPotionPlayerEnd", wren_actor, wren_alchemy_item);
 
 
       return result;
@@ -155,11 +171,98 @@ namespace core::hooks
     }
   };
 
+
+  STATIC_STRUCT(magic_target)
+
+    static constexpr auto addr_vtable_actor_owner_character = RE::Character::VTABLE[4];
+    static constexpr auto addr_vtable_actor_owner_player_character = RE::PlayerCharacter::VTABLE[4];
+    static constexpr auto offset_vtable_effect_added = RELOCATION_OFFSET(0x08, 0x08);
+
+    static auto on_effect_added_character(RE::MagicTarget* magic_target, RE::ActiveEffect* active_effect) -> void
+    {
+      if (!magic_target || !active_effect) {
+        return on_effect_added_character_original(magic_target, active_effect);
+      }
+      
+      wren::wrappers::active_effect wren_active_effect(active_effect);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedCharacterStart", wren_active_effect);
+
+      on_effect_added_character_original(magic_target, active_effect);
+      
+      wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedCharacterEnd", wren_active_effect);
+    }
+
+    static auto on_effect_added_player_character(RE::MagicTarget* magic_target,
+                                                 RE::ActiveEffect* active_effect) -> void
+    {
+      if (!magic_target || !active_effect) {
+        return on_effect_added_player_character_original(magic_target, active_effect);
+      }
+      
+      wren::wrappers::active_effect wren_active_effect(active_effect);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedPlayerStart", wren_active_effect);
+
+      on_effect_added_player_character_original(magic_target, active_effect);
+      
+      wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedPlayerEnd", wren_active_effect);
+    }
+
+    static inline REL::Relocation<decltype(on_effect_added_character)> on_effect_added_character_original;
+    static inline REL::Relocation<decltype(on_effect_added_player_character)>
+    on_effect_added_player_character_original;
+
+    static auto install_hook() -> void
+    {
+      write_vfunc(REL::Relocation<>{addr_vtable_actor_owner_character},
+                  offset_vtable_effect_added,
+                  on_effect_added_character,
+                  on_effect_added_character_original, "on_effect_added_character");
+      write_vfunc(REL::Relocation<>{addr_vtable_actor_owner_player_character},
+                  offset_vtable_effect_added,
+                  on_effect_added_player_character,
+                  on_effect_added_player_character_original, "on_effect_added_player_character");
+    }
+  };
+
+
+  STATIC_STRUCT(weapon_hit)
+
+    static constexpr auto addr = RELOCATION_ID(37673, 38627);
+    static constexpr auto offset = RELOCATION_OFFSET(0x3C0, 0x4A8);
+
+    static auto on_weapon_hit(RE::Actor* target, RE::HitData* hit_data) -> void
+    {
+      if (!target || !hit_data) {
+        return on_weapon_hit_original(target, hit_data);
+      }
+
+      wren::wrappers::hit_data wren_hit_data(hit_data);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnWeaponHitStart", wren_hit_data);
+
+      on_weapon_hit_original(target, hit_data);
+
+      wren::script_engine::engine::get_singleton()->dispatch("OnWeaponHitEnd", wren_hit_data);
+    }
+
+    static inline REL::Relocation<decltype(on_weapon_hit)> on_weapon_hit_original;
+
+    static auto install_hook(SKSE::Trampoline& trampoline) -> void
+    {
+      write_call<decltype(on_weapon_hit)>(trampoline, addr.address() + offset, on_weapon_hit,
+                                          on_weapon_hit_original, "on_weapon_hit");
+    }
+  };
+
   export auto install_hooks() -> void
   {
     auto& trampoline = SKSE::GetTrampoline();
-    trampoline.create(512);
+    trampoline.create(2048);
 
     character::install_hook();
+    weapon_hit::install_hook(trampoline);
+    magic_target::install_hook();
   }
 }

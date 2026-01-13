@@ -17,6 +17,7 @@ The plugin implements a "Bridge" architecture, allowing game logic to be written
     - **CommonLibSSE-NG:** Next-generation reverse engineered library supporting multi-targeting.
     - **SKSE64:** Script Extender.
     - **mINI:** Tiny, header-only C++ library for parsing `.ini` configuration (`src/library/mINI.h`).
+    - **SKSEMenuFramework:** For in-game UI configuration (`src/library/SKSEMenuFramework.h`).
 
 ---
 
@@ -55,27 +56,16 @@ This layer resolves the conflict between C++17 (WrenBind17) and the raw Skyrim e
 
 ### A. Exception Firewall
 - **Problem:** `wrenbind17` throws C++ exceptions on errors. Skyrim disables exception handling; escaping exceptions cause CTD.
-- **Solution:** All calls from C++ to Wren must be wrapped in a **safe_wren_call** barrier.
-  ```cpp
-  template<typename Func>
-  void safe_wren_call(Func&& f) {
-      try {
-          f();
-      } catch (const std::exception& e) {
-          SKSE::log::error("[Wren Error] {}", e.what());
-      } catch (...) {
-          SKSE::log::error("[Wren Error] Unknown exception");
-      }
-  }
-  ```
+- **Solution:** All calls from C++ to Wren must be wrapped in a **safe_wren_call** barrier (or try-catch blocks in hook handlers).
 
 ### B. Memory Management: Proxy Objects (Handles)
 - **CRITICAL:** Never pass raw `RE::Actor*` or `RE::TESForm*` to Wren.
 - **Problem:** `wrenbind17` uses `std::shared_ptr`. Skyrim uses intrusive `RE::BSTSmartPointer`. Holding raw pointers in scripts leads to **Double Frees** or CTD.
 - **Solution (Facade Pattern):**
-    1.  Wren interacts only with **Wrapper Classes** (e.g., `class wren_actor`).
+    1.  Wren interacts only with **Wrapper Classes** (defined in `src/Wren/Wrappers/`).
     2.  Wrappers store a safe **Handle** (`RE::ActorHandle`, `RE::FormID`), not a pointer.
     3.  Wrappers resolve the pointer instantly via `.get()` on every method call.
+    4.  Wrappers are exposed to Wren via `BindingManager.cpp`.
 
 ### C. Threading Model
 - **Constraint:** The Wren VM is **NOT** thread-safe.
@@ -88,27 +78,28 @@ This layer resolves the conflict between C++17 (WrenBind17) and the raw Skyrim e
 To avoid hardcoding specific scripts in C++, we use a centralized Event Bus with a strict lifecycle pattern.
 
 ### 5.1 Hook Lifecycle (The Sandwich Pattern)
-For critical hooks (e.g., `OnWeaponHit`, `OnDrinkPotion`), we implement a **Start/End** pattern to allow scripts to intervene both *before* and *after* the game logic.
+For critical hooks (e.g., `OnWeaponHit`, `OnDrinkPotion`), we implement a **Start/End** pattern.
 
-**Implementation in C++ Hook:**
+**Implementation in C++ Hook (`src/Core/Hooks.cpp`):**
 ```cpp
 void hooked_function(Args... args) {
-    // 1. START Event (Pre-Hook)
-    // Executes FIRST, before Valhalla/MCO or Vanilla logic.
-    dispatch("OnEventStart", args...);
+    // 1. Prepare Wrappers
+    wren::wrappers::actor wren_actor(character);
 
-    // 2. Original Call (Chain to other mods/Vanilla)
+    // 2. START Event (Pre-Hook)
+    wren::script_engine::engine::get_singleton()->dispatch("OnEventStart", wren_actor);
+
+    // 3. Original Call
     _original_func(args...);
 
-    // 3. END Event (Post-Hook)
-    // Executes LAST, after the game and all other mods have finished.
-    dispatch("OnEventEnd", args...);
+    // 4. END Event (Post-Hook)
+    wren::script_engine::engine::get_singleton()->dispatch("OnEventEnd", wren_actor);
 }
 ```
 
 ### 5.2 Dispatch Logic
-1.  **C++ Side:** Calls `dispatch("EventName", args...)`.
-2.  **Wren Core (`core/events.wren`):** Receives the call and iterates through registered listeners.
+1.  **C++ Side:** Calls `wren::script_engine::engine::get_singleton()->dispatch("EventName", args...)`.
+2.  **Wren Core (`Std/Events.wren`):** Receives the call and iterates through registered listeners.
 3.  **Wren Scripts:** Register via `Events.on("EventName", callback)`.
 
 ---
@@ -116,8 +107,7 @@ void hooked_function(Args... args) {
 ## 6. Configuration
 
 **Path:** `Data\SKSE\Plugins\zzWrenRim.ini`
-
-Configuration allows tuning VM constraints to prevent script-induced lag. Uses the **mINI** library.
+Managed by `src/Config.cpp` using `mINI`.
 
 ```ini
 [General]
@@ -125,13 +115,10 @@ bEnabled = true
 bEnableLogging = true
 
 [Memory]
-; Hard limit for Wren Heap (MB). Prevents OOM crashes.
 iMaxHeapSizeMB = 64
 iInitialHeapSizeMB = 8
 
 [Performance]
-; Max time budget for scripts per frame (microseconds).
-; 2000 us = 2 ms. If exceeded, subsequent events in the frame are dropped/deferred.
 iMaxFrameTimeBudgetUs = 2000
 ```
 
@@ -144,41 +131,32 @@ iMaxFrameTimeBudgetUs = 2000
 - **Config:** Follow `.clang-format`.
 
 ### Naming Conventions
-- **Modules:** `PascalCase.DotNotation` (e.g., `WrenRim.Core.Hooks`).
+- **Modules:** `PascalCase.DotNotation` (e.g., `WrenRim.Wren.Wrappers.Actor`).
 - **Universal snake_case:** All C++ identifiers MUST use `snake_case`.
-    - **Namespaces:** `core::hooks` (mapped from `WrenRim.Core.Hooks`).
-    - **Classes/Structs:** `class config_manager`, `struct actor_data`, `class wren_actor`.
+    - **Namespaces:** `wren::wrappers` (mapped from `WrenRim.Wren.Wrappers`).
+    - **Classes/Structs:** `class config_manager`, `struct actor_data`, `class actor` (wrapper).
     - **Functions/Methods:** `void do_something()`, `bool is_enabled()`.
-    - **Variables/Members:** `int heap_size`, `auto* actor`.
-- **No Hungarian Notation:** Never use prefixes like `bEnabled`, `fValue`, `iCount`. Use `enabled`, `value`, `count`.
-- **Exception:** External libraries (`RE::`, `SKSE::`) retain their original naming style.
+- **Exception:** External libraries (`RE::`, `SKSE::`, `ImGui::`) retain their original naming style.
 
 ### C++ Modules
 - **Policy:** The project uses **C++20 Modules**.
-- **Implementation:** New subsystems should be implemented as modules (`export module WrenRim.MyModule;`) where possible.
-- **Interop:** Legacy headers (CommonLibSSE, Wren) are handled via PCH or Global Module Fragments (`module; #include ...`).
-- **Referencing:** See existing project files for module syntax examples.
+- **Location:** Source files in `src/` serve as module interfaces/implementations.
+- **Structure:**
+    - `WrenRim.Core.*`: Core logic (Hooks, Utils, Log).
+    - `WrenRim.Wren.*`: Wren VM integration and Wrappers.
+    - `WrenRim.UI.*`: UI/Menu logic.
+    - `WrenRim.Events.*`: Native event handling.
 
 ### Precompiled Headers (PCH)
 - **Global Includes:** `wren.hpp` and `wrenbind17/wrenbind17.hpp` are included globally in `src/pch.h`.
-- **Rule:** DO NOT `#include "pch.h"` in individual source files (`.cpp`). The build system (xmake) is configured to force-include this header globally for all compilation units. Adding it manually is redundant and may cause issues (especially with C++ Modules).
-- **Rule:** DO NOT `#include <wrenbind17/wrenbind17.hpp>` in individual `.cpp` files. Assume `wrenbind17` namespace is always available.
+- **Rule:** DO NOT `#include "pch.h"` manually in `.cpp` files. xmake handles this.
 
-### Safety & Pointers
-- **Volatile Data:** All pointers from `RE::` are volatile. Always check for `nullptr`.
-- **Casting:** Use `skyrim_cast<Target*>(source)` for RTTI safety across game versions.
-
-### Utilities & Helpers
-- **Location:** Global helper functions (string manipulation, math, generic logging) reside in **`src/Core/Utility.cpp`** (and `.h`).
-
-### Error Handling
-- **General C++:** No `try-catch` in general game logic.
-- **Wren Boundary:** Use `safe_wren_call` explicitly.
-
-### Build & Project Management (CRITICAL)
-- **Warnings as Errors:** The project treats all warnings as errors (`/WX` equivalent). You MUST resolve all warnings.
-    - **`[[nodiscard]]`:** Never ignore the return value of a function marked `[[nodiscard]]`. If the value is truly not needed, explicit check or handling is required.
-- **VS Project Updates:** Whenever you modify `xmake.lua` (add files, change rules), you MUST run the update command (e.g., `xmake project -k vsxmake2022`) to ensure the Visual Studio solution stays in sync. NEVER skip this step if build configurations change.
+### 7.4 Binding with wrenbind17 (Gotchas)
+- **Static vs Instance Methods:** When binding C++ methods to Wren using `wrenbind17`, you MUST use the correct binding function based on the method type:
+    - Use **`cls.func<&Class::method>("name")`** ONLY for non-static instance methods.
+    - Use **`cls.funcStatic<&Class::static_method>("name")`** for static methods or standalone functions.
+- **Symptom:** Using `func` for a static method causes `Error C2027: use of undefined type 'wrenbind17::detail::ForeignMethodDetails...'`. This happens because the template specialization for instance methods fails to match the signature of a static function pointer.
+- **Example Fix:** In static wrapper classes like `UI` or static factory methods in `GFxValue`, ensure `funcStatic` is used for all exported members.
 
 ---
 
@@ -189,73 +167,54 @@ The project uses `xmake` to generate a MO2-ready structure in `dist/`.
 ```text
 /
 ├── src/
-│   ├── library/           # Vendored dependencies
-│   │   ├── wren/          # Wren C Source (VM & Optional)
-│   │   ├── wrenbind17/    # C++17 Bindings
-│   │   └── mINI.h         # mINI header (Single file)
-│   ├── Core/              # Config, Utility, Hooks
-│   ├── WrenRimStd/        # Standard Library (.wren)
-│   │   ├── core/
-│   │   │   └── events.wren
-│   │   └── ...
-├── xmake.lua              # Build script (Compiles Wren VM + C++ Plugin)
+│   ├── library/           # Vendored dependencies (wren, wrenbind17, mINI, SKSEMenuFramework)
+│   ├── Core/              # Config, Utility, Hooks, Logger
+│   ├── Events/            # Native Event Sinks (e.g., MenuEvent)
+│   ├── UI/                # ImGui/SKSEMenu logic
+│   ├── Wren/              # Wren VM Integration
+│   │   ├── Wrappers/      # C++ Wrappers for Skyrim types (Actor, Weapon, etc.)
+│   │   ├── BindingManager.cpp # Binds wrappers to Wren VM
+│   │   └── ScriptEngine.cpp   # VM management and event dispatch
+│   ├── WrenRim/           # Wren Source Files (deployed to Data/...)
+│   │   ├── Std/           # Standard Library (Events.wren, Skyrim/*.wren)
+│   │   └── WrenMods/      # User Scripts / Example Mods
+├── xmake.lua              # Build script
 └── dist/ (Generated)
     └── SKSE/
         └── Plugins/
             ├── zzWrenRim.dll
             ├── zzWrenRim.ini
             └── WrenRim/
-                └── WrenRimStd/  # Scripts deploy here
+                ├── Std/       # Standard Library scripts
+                └── WrenMods/  # User scripts
 ```
 
 ## 9. Wren Scripting & Standard Library
 
 ### 9.1 Scripting Guidelines
-1.  **Imports:** Always `import "core/events" for Events`.
-2.  **Lifecycle:** Use `On...Start` (pre) and `On...End` (post) logic correctly.
-3.  **Registration:** Register events at the bottom of the file.
+1.  **Imports:** `import "Events" for Events` (Standard Library modules are in `Std/`).
+2.  **Skyrim Types:** `import "Skyrim/Actor" for Actor`.
+3.  **Lifecycle:** Use `On...Start` (pre) and `On...End` (post) logic.
 
 ### 9.2 Extending WrenRimStd
-- **Mandate:** You are authorized and encouraged to populate `src/WrenRimStd` with standard bindings.
-- **New Types:** If the project needs a new Skyrim type (e.g., `Potion`, `Spell`, `Enchantment`) available in Wren, create the corresponding `.wren` wrapper in `WrenRimStd` and the C++ binding logic in `src/API`.
+- **New Types:**
+    1.  Create C++ Wrapper in `src/Wren/Wrappers/`.
+    2.  Bind it in `src/Wren/BindingManager.cpp`.
+    3.  Create Wren definition in `src/WrenRim/Std/Skyrim/`.
 
-**Template:**
+**Example Script (`src/WrenRim/WrenMods/MyMod.wren`):**
 ```wren
-import "core/events" for Events
+import "Events" for Events
+import "Skyrim/Actor" for Actor
 
-class PotionLogic {
-    static onDrinkStart(actor, potion) {
-        if (potion.isPoison) System.print("Don't drink that!")
+Events.on("OnDrinkPotionStart", Fn.new { |actor, potion|
+    if (actor.getName() == "Prisoner") {
+        System.print("Prisoner is drinking!")
     }
-}
-Events.on("OnDrinkPotionStart", Fn.new { |a, p| PotionLogic.onDrinkStart(a, p) })
+})
 ```
 
 ### 9.3 Wren Language Constraints & Gotchas
-
-#### Variable & Field Naming
-- **Module-level variables:** MUST NOT start with an underscore (e.g., use `var listeners = {}`, NOT `var _listeners = {}`). In Wren, a leading underscore is strictly reserved for **instance fields** within a class.
-- **Static fields:** Static fields in a class must start with two underscores (e.g., `static __config`).
-- **Instance fields:** Instance fields must start with one underscore (e.g., `_actor`).
-- **Local variables:** Should start with a lowercase letter and no underscore.
-- **Error symptoms:** Using `_name` at the module level or inside a static method will cause a compile error: `"Expect variable name"` or `"Cannot use an instance field in a static method"`.
-
-#### Module Resolution & C++ Bindings (CRITICAL)
-- **Problem:** By default, `wrenbind17` resolves imports (like `import "Skyrim/Actor"`) to absolute file paths on disk. However, C++ bindings are registered against logical names (e.g., `vm.module("Skyrim/Actor")`).
-- **Symptom:** If these names don't match exactly, the VM will crash or freeze when calling `runFromModule` or when a script attempts to use a `foreign class` whose module ID has been mangled into a path.
-- **Resolution:** We override `setPathResolveFunc` in `ScriptEngine.cpp` to return the logical `name` directly, ensuring the Module ID in the VM remains "Skyrim/Actor" instead of "C:/Path/To/Skyrim/Actor.wren".
-- **Rule:** Always ensure `vm.runFromModule("Name")` matches the name used in `vm.module("Name")` in C++.
-
-#### Events System & Scoping
-- **Error:** `Events metaclass does not implement 'listeners'`.
-- **Cause:** Using a module-level variable (`var listeners`) and accessing it from a `static` class method can sometimes lead to resolution issues or "instance vs static" confusion in the Wren compiler if the variable name overlaps with field naming conventions.
-- **Resolution:** Use a **class-static field** (e.g., `static __listeners`) inside the class. This ensures the storage is explicitly bound to the class metaclass and is accessible from all static methods.
-- **Template:**
-  ```wren
-  class Events {
-      static on(event, fn) {
-          if (__listeners == null) __listeners = {}
-          // ...
-      }
-  }
-  ```
+- **Static Fields:** Must start with `__` (e.g., `static __listeners`).
+- **Module Resolution:** Imports resolve to logical names (e.g., "Skyrim/Actor"), managed by `ScriptEngine.cpp`.
+- **Variable Names:** Module-level variables cannot start with underscore.

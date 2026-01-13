@@ -36,6 +36,9 @@ set_config("skse_xbyak", true)
 -- Определение правила для .wren файлов (если понадобится компиляция в будущем)
 rule("whren_scripts")
     set_extensions(".wren")
+    
+rule("papyrus_source")
+    set_extensions(".psc")
 
 -- targets
 -- ВАЖНО: Имя таргета определяет имя DLL. Здесь оно "zzWrenRim"
@@ -52,6 +55,7 @@ target("zzWrenRim")
     })
 
     add_rules("whren_scripts")
+    add_rules("papyrus_source")
 
     -- add src files
     add_includedirs("src")
@@ -65,13 +69,14 @@ target("zzWrenRim")
     set_pcxxheader("src/pch.h")
 
     -- Собираем все нужные файлы
-    add_headerfiles("src/**.h", "src/**.hpp", "src/**.wren")
+    add_headerfiles("src/**.h", "src/**.hpp", "src/**.wren", "src/**.psc")
     add_files("src/library/wren/src/vm/*.c", {warnings = "none", cxflags = "/wd4200 /wd4100 /wd4996 /wd4244 /wd4456"})
     add_files("src/library/wren/src/optional/*.c", {warnings = "none", cxflags = "/wd4200 /wd4100 /wd4996 /wd4244 /wd4456"})
     add_files("src/**.cpp")
     -- Можно добавить Wren файлы в проект, чтобы видеть их в IDE,
     -- но исключить из компиляции C++, так как у нас свое правило copy
     add_files("src/WrenRim/**.wren", {rule = "whren_scripts"})
+    add_files("src/library/PapyrusSKSE/**.psc", {rule = "papyrus_source"})
 
     after_build(function(target)
         import("core.project.task")

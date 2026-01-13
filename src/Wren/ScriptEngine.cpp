@@ -1,7 +1,7 @@
 export module WrenRim.Wren.ScriptEngine;
 
 import WrenRim.Config;
-import WrenRim.API.Wrappers;
+import WrenRim.Wren.BindingManager;
 
 namespace wren::script_engine
 {
@@ -29,9 +29,9 @@ namespace wren::script_engine
 			logger::info("Initializing Wren ScriptEngine...");
 
 			// Create new VM instance
-			vm_ = std::make_unique<wrenbind17::VM>(std::vector<std::string>{ 
-				"Data/SKSE/Plugins/WrenRim/Std", 
-				"Data/SKSE/Plugins/WrenRim/WrenMods" 
+			vm_ = std::make_unique<wrenbind17::VM>(std::vector<std::string>{
+				"Data/SKSE/Plugins/WrenRim/Std",
+				"Data/SKSE/Plugins/WrenRim/WrenMods"
 			});
 
 			// Configure Module Resolution
@@ -44,7 +44,7 @@ namespace wren::script_engine
 					"Data/SKSE/Plugins/WrenRim/Std",
 					"Data/SKSE/Plugins/WrenRim/WrenMods"
 				};
-				
+
 				for (const auto& base_path : search_paths) {
 					auto full_path = fs::path(base_path) / (name + ".wren");
 					if (fs::exists(full_path)) {
@@ -52,32 +52,40 @@ namespace wren::script_engine
 						return std::string((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 					}
 				}
-				
+
 				throw std::runtime_error("Module not found: " + name);
 			});
 
 			// Register Bindings (C++ -> Wren)
-			api::wrappers::bind_wrappers(*vm_);
-		  
+			wren::binding_manager::bind_wrappers(*vm_);
+
 
 			// 1. Pre-load Standard Library
 			try {
 				logger::info("Loading Standard Library...");
-			  
+
 			  // 1. Настройка логгера (чтобы System.print писал в лог SKSE)
 			  vm_->setPrintFunc([](const char* text) {
 				if (text[0] == '\n' && text[1] == '\0') return;
                 SKSE::log::info("[Wren] {}", text);
               });
-				
+
 				// Core Events
 				vm_->runFromModule("Events");
 
 				// Skyrim Types (Essential for Hooks)
-				// We load them so their methods (foreign class ...) are registered 
+				// We load them so their methods (foreign class ...) are registered
 				// before any event passes these objects to scripts.
+				logger::info("Loading Skyrim Types...");
 				vm_->runFromModule("Skyrim/Actor");
-				vm_->runFromModule("Skyrim/Potion");
+				vm_->runFromModule("Skyrim/AlchemyItem");
+				vm_->runFromModule("Skyrim/HitData");
+				vm_->runFromModule("Skyrim/Weapon");
+				vm_->runFromModule("Skyrim/Armor");
+				vm_->runFromModule("Skyrim/ActiveEffect");
+				vm_->runFromModule("Skyrim/UI");
+				vm_->runFromModule("Skyrim/GFxValue");
+				vm_->runFromModule("Skyrim/Spell");
 			}
 			catch (const std::exception& e) {
 				logger::error("Failed to load Standard Library: {}", e.what());
@@ -89,7 +97,7 @@ namespace wren::script_engine
 				const fs::path mods_path = "Data/SKSE/Plugins/WrenRim/WrenMods";
 				if (fs::exists(mods_path) && fs::is_directory(mods_path)) {
 					logger::info("Loading User Mods from: {}", mods_path.string());
-					
+
 					for (const auto& entry : fs::directory_iterator(mods_path)) {
 						if (entry.is_regular_file() && entry.path().extension() == ".wren") {
 							logger::info("  Running script: {}", entry.path().filename().string());
@@ -130,7 +138,7 @@ namespace wren::script_engine
 			initialize();
 			logger::info("Nuclear Reload complete.");
 		}
-		
+
 		void on_frame_start()
 		{
 			accumulated_time_us_ = 0;
@@ -154,7 +162,7 @@ namespace wren::script_engine
 			try {
 				// Look for "Events" class in "Events" module
 				auto events_class = vm_->find("Events", "Events");
-				
+
 				// Generate signature: dispatch(_,_,...)
 				std::string signature = "dispatch(";
 				constexpr size_t arg_count = 1 + sizeof...(Args);
@@ -178,9 +186,9 @@ namespace wren::script_engine
 			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 			accumulated_time_us_ += duration;
 
-			//if (duration > 10) {
-				logger::info("[Wren] Event {} took {}us", event_name, duration);
-			//}
+			if (duration > 10) {
+				logger::info("[Wren] Event {} took {}us AccumulatedTime {}us", event_name, duration, accumulated_time_us_);
+			}
 		}
 
 		void run_string(const std::string& code) {
