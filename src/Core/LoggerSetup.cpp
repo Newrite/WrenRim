@@ -1,5 +1,6 @@
 ﻿module;
 
+#include "pch.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/pattern_formatter.h"
 

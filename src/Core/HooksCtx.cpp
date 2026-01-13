@@ -1,4 +1,8 @@
-﻿export module WrenRim.Core.HooksCtx;
+module;
+
+#include "pch.h"
+
+export module WrenRim.Core.HooksCtx;
 
 namespace core::hooks_ctx
 {

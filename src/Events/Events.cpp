@@ -1,4 +1,8 @@
-﻿export module WrenRim.Events;
+module;
+
+#include "pch.h"
+
+export module WrenRim.Events;
 
 import WrenRim.Events.MenuEvent;
 

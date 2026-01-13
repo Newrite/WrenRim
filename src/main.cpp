@@ -1,3 +1,5 @@
+#include "pch.h"
+
 import WrenRim.Core.LoggerSetup;
 import WrenRim.UI.SKSEMenu;
 import WrenRim.Events;

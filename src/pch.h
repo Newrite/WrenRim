@@ -1,6 +1,6 @@
 #pragma once
 
-#pragma execution_character_set("utf-8")
+// #pragma execution_character_set("utf-8")
 #define NOMINMAX
 
 #include <RE/Skyrim.h>

@@ -1,3 +1,7 @@
+module;
+
+#include "pch.h"
+
 export module WrenRim.Events.MenuEvent;
 
 import WrenRim.Events.EventsCtx;
@@ -10,9 +14,9 @@ export struct menu_event_handler final : RE::BSTEventSink<RE::MenuOpenCloseEvent
     {
         static menu_event_handler singleton;
         return std::addressof(singleton);
-        
-    }  
-    
+
+    }
+
   static auto register_handler() -> void
   {
     logger::info("Start register menu open close handler"sv);
@@ -33,6 +37,6 @@ export struct menu_event_handler final : RE::BSTEventSink<RE::MenuOpenCloseEvent
     auto ctx = events_ctx::process_event_menu_ctx{menu_event, event_source, menu_event->menuName, menu_event->opening};
     return RE::BSEventNotifyControl::kContinue;
   }
-    
+
 };
 }

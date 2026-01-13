@@ -138,12 +138,13 @@ iMaxFrameTimeBudgetUs = 2000
     - **Functions/Methods:** `void do_something()`, `bool is_enabled()`.
 - **Exception:** External libraries (`RE::`, `SKSE::`, `ImGui::`) retain their original naming style.
 
-### C++ Modules
-- **Policy:** The project uses **C++20 Modules**.
+### C++ Modules & Headers
+- **Policy:** The project uses **C++20 Modules** for most subsystems, but **Header Files (.hpp)** for Wren Wrappers to handle circular dependencies.
 - **Location:** Source files in `src/` serve as module interfaces/implementations.
 - **Structure:**
     - `WrenRim.Core.*`: Core logic (Hooks, Utils, Log).
-    - `WrenRim.Wren.*`: Wren VM integration and Wrappers.
+    - `WrenRim.Wren.*`: Wren VM integration.
+    - `src/Wren/Wrappers/*.hpp`: **Header-only** wrappers (aggregated in `Wrappers.hpp`).
     - `WrenRim.UI.*`: UI/Menu logic.
     - `WrenRim.Events.*`: Native event handling.
 
@@ -172,7 +173,7 @@ The project uses `xmake` to generate a MO2-ready structure in `dist/`.
 │   ├── Events/            # Native Event Sinks (e.g., MenuEvent)
 │   ├── UI/                # ImGui/SKSEMenu logic
 │   ├── Wren/              # Wren VM Integration
-│   │   ├── Wrappers/      # C++ Wrappers for Skyrim types (Actor, Weapon, etc.)
+│   │   ├── Wrappers/      # C++ Wrappers (.hpp) for Skyrim types (Actor, Weapon, etc.)
 │   │   ├── BindingManager.cpp # Binds wrappers to Wren VM
 │   │   └── ScriptEngine.cpp   # VM management and event dispatch
 │   ├── WrenRim/           # Wren Source Files (deployed to Data/...)

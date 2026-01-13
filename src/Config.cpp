@@ -1,6 +1,7 @@
 module;
 
 #include "library/mINI.h"
+#include "pch.h"
 
 export module WrenRim.Config;
 

@@ -1,7 +1,7 @@
 ﻿module;
 
+#include "pch.h"
 #include "library/SKSEMenuFramework.h"
-#include <string>
 
 export module WrenRim.UI.SKSEMenu;
 
@@ -11,7 +11,7 @@ import WrenRim.Wren.ScriptEngine;
 namespace ui::skse_menu
 {
   using namespace ImGuiMCP;
-  
+
   auto __stdcall render_main() -> void
   {
       auto cfg = config::manager::get_singleton();
@@ -40,9 +40,9 @@ namespace ui::skse_menu
 
     static constexpr auto main_title = "WrenRim";
     SKSEMenuFramework::SetSection(main_title);
-    
+
     static constexpr auto config_title = "Config";
     SKSEMenuFramework::AddSectionItem(config_title, render_main);
-    
+
   }
 }

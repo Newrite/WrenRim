@@ -1,6 +1,7 @@
 ﻿module;
 
 #include <expected>
+#include "pch.h"
 #include <Windows.h>
 
 export module WrenRim.Core.Utility;

@@ -1,12 +1,14 @@
-﻿export module WrenRim.Core.Hooks;
+﻿module;
+
+#include "pch.h"
+
+#include "Wren/Wrappers/Wrappers.hpp"
+
+export module WrenRim.Core.Hooks;
 
 import WrenRim.Core.HooksCtx;
 import WrenRim.Config;
 import WrenRim.Wren.ScriptEngine;
-import WrenRim.Wren.Wrappers.Actor;
-import WrenRim.Wren.Wrappers.AlchemyItem;
-import WrenRim.Wren.Wrappers.ActiveEffect;
-import WrenRim.Wren.Wrappers.HitData;
 
 namespace core::hooks
 {
@@ -183,13 +185,13 @@ namespace core::hooks
       if (!magic_target || !active_effect) {
         return on_effect_added_character_original(magic_target, active_effect);
       }
-      
+
       wren::wrappers::active_effect wren_active_effect(active_effect);
 
       wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedCharacterStart", wren_active_effect);
 
       on_effect_added_character_original(magic_target, active_effect);
-      
+
       wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedCharacterEnd", wren_active_effect);
     }
 
@@ -199,13 +201,13 @@ namespace core::hooks
       if (!magic_target || !active_effect) {
         return on_effect_added_player_character_original(magic_target, active_effect);
       }
-      
+
       wren::wrappers::active_effect wren_active_effect(active_effect);
 
       wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedPlayerStart", wren_active_effect);
 
       on_effect_added_player_character_original(magic_target, active_effect);
-      
+
       wren::script_engine::engine::get_singleton()->dispatch("OnEffectAddedPlayerEnd", wren_active_effect);
     }
 

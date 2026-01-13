@@ -1,4 +1,8 @@
-﻿export module WrenRim.Events.EventsCtx;
+module;
+
+#include "pch.h"
+
+export module WrenRim.Events.EventsCtx;
 
 export namespace events::events_ctx
 {

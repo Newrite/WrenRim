@@ -94,3 +94,35 @@ class Events {
         }
     }
 }
+
+class GameEvents {
+  static OnDataLoaded { "OnDataLoaded" }
+}
+
+class UIEvents {
+  static OnMenuOpen { "OnMenuOpen" }
+  static OnMenuClose { "OnMenuClose" }
+}
+
+class PlayerEvents {
+  static OnUpdateCharacterStart { "OnUpdatePlayerStart" }
+  static OnUpdateCharacterEnd { "OnUpdatePlayerEnd" }
+  static OnDrinkPotionStart { "OnDrinkPotionPlayerStart" }
+  static OnDrinkPotionEnd { "OnDrinkPotionPlayerEnd" }
+  static OnEffectAddedStart { "OnEffectAddedPlayerStart" }
+  static OnEffectAddedEnd { "OnEffectAddedPlayerEnd" }
+}
+
+class CharacterEvents {
+  static OnUpdateCharacterStart { "OnUpdateCharacterStart" }
+  static OnUpdateCharacterEnd { "OnUpdateCharacterEnd" }
+  static OnDrinkPotionStart { "OnDrinkPotionCharacterStart" }
+  static OnDrinkPotionEnd { "OnDrinkPotionCharacterEnd" }
+  static OnEffectAddedStart { "OnEffectAddedCharacterStart" }
+  static OnEffectAddedEnd { "OnEffectAddedCharacterEnd" }
+}
+
+class GameplayEvents {
+  static OnWeaponHitStart { "OnWeaponHitStart" }
+  static OnWeaponHitEnd { "OnWeaponHitEnd" }
+}
